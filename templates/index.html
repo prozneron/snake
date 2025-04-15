@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Snake Game</title>
+    <style>
+        body {
+            font-family: monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #f0f0f0;
+            margin: 0;
+            padding: 5px;
+        }
+        #game-container {
+            margin: 5px;
+        }
+        #game-board {
+            border: 2px solid #333;
+            background-color: #fff;
+            padding: 5px;
+        }
+        .cell {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            text-align: center;
+            line-height: 10px;
+            font-size: 10px;
+        }
+        #controls {
+            margin: 5px;
+            display: flex;
+            gap: 5px;
+        }
+        button {
+            padding: 5px 10px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+        #settings {
+            margin: 5px;
+            padding: 10px;
+            border: 1px solid #333;
+            background-color: #fff;
+        }
+        #mobile-controls {
+            display: none;
+            margin-top: 5px;
+            width: 100%;
+            max-width: 250px;
+        }
+        .mobile-controls-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5px;
+            width: 100%;
+        }
+        .mobile-btn {
+            padding: 15px;
+            font-size: 20px;
+            text-align: center;
+            background-color: #ddd;
+            border: 1px solid #333;
+            border-radius: 5px;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .mobile-btn:active {
+            background-color: #bbb;
+        }
+        #score-display {
+            margin: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #333;
+        }
+        .score-value {
+            color: #0066cc;
+        }
+        .lives-value {
+            color: #cc0000;
+        }
+        .control-info {
+            margin: 5px 0;
+            padding: 5px;
+            background-color: #e0e0e0;
+            border-radius: 3px;
+            text-align: center;
+            font-size: 14px;
+        }
+        h1 {
+            margin: 5px;
+            font-size: 20px;
+        }
+        #settings h2 {
+            margin: 5px;
+            font-size: 16px;
+        }
+        #settings div {
+            margin: 5px 0;
+        }
+        @media (max-width: 768px) {
+            #mobile-controls {
+                display: block;
+            }
+            .mobile-btn {
+                font-size: 24px;
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>Snake Game</h1>
+    <div id="score-display">
+        High Score: <span id="high-score" class="score-value">0</span> | 
+        Current Score: <span id="current-score" class="score-value">0</span> |
+        Lives: <span id="lives" class="lives-value">3</span>
+    </div>
+    <div class="control-info" id="control-info">
+        Controls: Arrow Keys
+    </div>
+    <div id="game-container">
+        <div id="game-board"></div>
+    </div>
+    <div id="controls">
+        <button id="start-btn">Start Game</button>
+        <button id="settings-btn">Settings</button>
+    </div>
+    <div id="mobile-controls">
+        <div class="mobile-controls-grid">
+            <div class="mobile-btn" data-direction="up" id="up-btn">↑</div>
+            <div class="mobile-btn" data-direction="left" id="left-btn">←</div>
+            <div class="mobile-btn" data-direction="right" id="right-btn">→</div>
+            <div class="mobile-btn" data-direction="down" id="down-btn">↓</div>
+        </div>
+    </div>
+    <div id="settings" style="display: none;">
+        <h2>Settings</h2>
+        <div>
+            <label>Borders:</label>
+            <select id="borders-setting">
+                <option value="kills">Kills</option>
+                <option value="teleport">Teleport</option>
+            </select>
+        </div>
+        <div>
+            <label>Lives:</label>
+            <select id="lives-setting">
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+            </select>
+        </div>
+        <div>
+            <label>Speed:</label>
+            <select id="speed-setting">
+                <option value="slow">Slow</option>
+                <option value="normal">Normal</option>
+                <option value="fast">Fast</option>
+            </select>
+        </div>
+        <div>
+            <label>Controls:</label>
+            <select id="controls-setting">
+                <option value="arrows">Arrow Keys</option>
+                <option value="wasd">WASD Keys</option>
+            </select>
+        </div>
+        <button id="save-settings">Save Settings</button>
+    </div>
+
+    <script>
+        let gameState = null;
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let gameLoop;
+        let currentControls = 'arrows';
+
+        const controlMaps = {
+            arrows: {
+                'ArrowUp': 'up',
+                'ArrowDown': 'down',
+                'ArrowLeft': 'left',
+                'ArrowRight': 'right',
+                'up': '↑',
+                'down': '↓',
+                'left': '←',
+                'right': '→'
+            },
+            wasd: {
+                'w': 'up',
+                's': 'down',
+                'a': 'left',
+                'd': 'right',
+                'up': 'W',
+                'down': 'S',
+                'left': 'A',
+                'right': 'D'
+            }
+        };
+
+        function updateControlInfo() {
+            const controlInfo = document.getElementById('control-info');
+            controlInfo.textContent = `Controls: ${currentControls === 'arrows' ? 'Arrow Keys' : 'WASD Keys'}`;
+            
+            // Update mobile control buttons
+            document.getElementById('up-btn').textContent = controlMaps[currentControls]['up'];
+            document.getElementById('down-btn').textContent = controlMaps[currentControls]['down'];
+            document.getElementById('left-btn').textContent = controlMaps[currentControls]['left'];
+            document.getElementById('right-btn').textContent = controlMaps[currentControls]['right'];
+        }
+
+        function updateBoard() {
+            const board = document.getElementById('game-board');
+            board.innerHTML = '';
+            
+            if (!gameState) return;
+
+            gameState.board.forEach(row => {
+                const rowDiv = document.createElement('div');
+                row.forEach(cell => {
+                    const cellDiv = document.createElement('span');
+                    cellDiv.className = 'cell';
+                    cellDiv.textContent = cell;
+                    rowDiv.appendChild(cellDiv);
+                });
+                board.appendChild(rowDiv);
+            });
+
+            // Update score display
+            document.getElementById('current-score').textContent = gameState.score;
+            document.getElementById('high-score').textContent = gameState.high_score;
+            document.getElementById('lives').textContent = gameState.lives;
+            
+            // Update controls if changed
+            if (gameState.controls && gameState.controls !== currentControls) {
+                currentControls = gameState.controls;
+                updateControlInfo();
+            }
+        }
+
+        function handleKeyPress(e) {
+            const keyMap = controlMaps[currentControls];
+            const direction = keyMap[e.key.toLowerCase()];
+            if (direction) {
+                moveSnake(direction);
+            }
+        }
+
+        function moveSnake(direction) {
+            fetch('/move', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ direction }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                gameState = data;
+                updateBoard();
+            });
+        }
+
+        function startGame() {
+            fetch('/start_game', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(() => {
+                updateGameState();
+                // Start the game loop
+                if (gameLoop) clearInterval(gameLoop);
+                gameLoop = setInterval(updateGameState, 50);
+            });
+        }
+
+        function updateGameState() {
+            fetch('/get_game_state')
+            .then(response => response.json())
+            .then(data => {
+                gameState = data;
+                updateBoard();
+                if (gameState.game_over) {
+                    clearInterval(gameLoop);
+                }
+            });
+        }
+
+        function saveSettings() {
+            const settings = {
+                borders: document.getElementById('borders-setting').value,
+                lives: parseInt(document.getElementById('lives-setting').value),
+                speed: document.getElementById('speed-setting').value,
+                controls: document.getElementById('controls-setting').value
+            };
+
+            fetch('/update_settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings),
+            })
+            .then(() => {
+                currentControls = settings.controls;
+                updateControlInfo();
+            });
+        }
+
+        // Event Listeners
+        document.getElementById('start-btn').addEventListener('click', startGame);
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            const settingsDiv = document.getElementById('settings');
+            settingsDiv.style.display = settingsDiv.style.display === 'none' ? 'block' : 'none';
+        });
+        document.getElementById('save-settings').addEventListener('click', saveSettings);
+
+        document.querySelectorAll('.mobile-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                moveSnake(e.target.dataset.direction);
+            });
+        });
+
+        document.addEventListener('keydown', handleKeyPress);
+
+        // Touch controls
+        document.addEventListener('touchstart', (e) => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            const touchEndX = e.changedTouches[0].clientX;
+            const touchEndY = e.changedTouches[0].clientY;
+            
+            const diffX = touchEndX - touchStartX;
+            const diffY = touchEndY - touchStartY;
+            
+            if (Math.abs(diffX) > Math.abs(diffY)) {
+                moveSnake(diffX > 0 ? 'right' : 'left');
+            } else {
+                moveSnake(diffY > 0 ? 'down' : 'up');
+            }
+        });
+
+        // Handle window focus
+        window.addEventListener('blur', () => {
+            if (gameState && !gameState.game_over) {
+                gameState.paused = true;
+                updateBoard();
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            if (gameState && gameState.paused) {
+                gameState.paused = false;
+                updateBoard();
+            }
+        });
+
+        // Initial settings load
+        fetch('/')
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            const settings = JSON.parse(doc.querySelector('#settings-data').textContent);
+            document.getElementById('borders-setting').value = settings.borders;
+            document.getElementById('lives-setting').value = settings.lives;
+            document.getElementById('speed-setting').value = settings.speed;
+            document.getElementById('controls-setting').value = settings.controls;
+            document.getElementById('high-score').textContent = settings.high_score;
+            currentControls = settings.controls;
+            updateControlInfo();
+        });
+    </script>
+</body>
+</html> 
